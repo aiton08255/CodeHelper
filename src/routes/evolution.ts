@@ -3,6 +3,7 @@ import { getRecentChanges } from '../evolution/changelog.js';
 import { loadParams, resetParam } from '../evolution/params.js';
 import { getPerformanceSummary } from '../evolution/analyzer.js';
 import { consolidateKnowledge, getKBHealth } from '../evolution/consolidator.js';
+import { getCacheStats } from '../memory/semantic-cache.js';
 import { discoverTools, getDiscoveries, updateToolStatus } from '../evolution/discovery.js';
 
 export const evolutionRouter = new Hono();
@@ -34,7 +35,7 @@ evolutionRouter.get('/api/evolution/performance', (c) => {
 
 // Knowledge base health
 evolutionRouter.get('/api/evolution/kb-health', (c) => {
-  return c.json(getKBHealth());
+  return c.json({ ...getKBHealth(), semantic_cache: getCacheStats() });
 });
 
 // Consolidate knowledge base (cleanup)

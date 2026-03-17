@@ -11,6 +11,7 @@ import { stageCompose } from './stage-compose.js';
 import { stageStore } from './stage-store.js';
 import { runInstantPipeline } from './instant.js';
 import { classifyQuery, Depth } from './classifier.js';
+import { checkSemanticCache, storeInSemanticCache } from '../memory/semantic-cache.js';
 
 export interface PipelineContext {
   query: string;
@@ -38,6 +39,14 @@ export async function runPipeline(ctx: PipelineContext): Promise<ResearchReport>
     const detected = classifyQuery(ctx.query);
     ctx.emit({ type: 'auto-depth', detected, detail: `Auto-classified as ${detected}` });
     ctx.depth = detected;
+  }
+
+  // Semantic cache check — sub-100ms for similar queries (inspired by LixSearch)
+  const cached = checkSemanticCache(ctx.query, ctx.depth);
+  if (cached.hit) {
+    ctx.emit({ type: 'stage-progress', stage: 'recall', progress: 100, detail: `Semantic cache hit (${((cached.similarity || 0) * 100).toFixed(0)}% match)` });
+    ctx.emit({ type: 'done', report_id: 0, overall_confidence: cached.result.overall_confidence || 0.5 });
+    return cached.result;
   }
 
   // Route instant queries to the lightweight pipeline
@@ -125,6 +134,9 @@ async function runFullPipeline(ctx: PipelineContext & { depth: 'quick' | 'standa
     stageStore(ctx, { query: ctx.query, depth: ctx.depth, executive_summary: '', findings: '', limitations: '', sources: [], overall_confidence: outline.overall_confidence, claims: allClaims } as any, allClaims, Date.now() - startTime)
       .catch(() => {}), // non-critical if pre-store fails
   ]);
+
+  // Cache the result for future semantic matching
+  storeInSemanticCache(ctx.query, ctx.depth, report);
 
   ctx.emit({ type: 'done', report_id: 0, overall_confidence: report.overall_confidence });
   return report;
