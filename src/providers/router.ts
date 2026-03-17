@@ -37,9 +37,11 @@ export async function executeSearch(
     case 'duckduckgo':
       return variant === 'news' ? ddgNewsSearch(query) : ddgSearch(query);
     case 'exa':
-      return exaSearch(query, keys.exa || '', { category: variant });
+      if (!keys.exa) return [];
+      return exaSearch(query, keys.exa, { category: variant });
     case 'serper':
-      return serperSearch(query, keys.serper || '');
+      if (!keys.serper) return [];
+      return serperSearch(query, keys.serper);
     case 'webfetch':
       return [];
     default:

@@ -5,8 +5,18 @@ import { getDb } from '../db/connection.js';
 
 export const researchRouter = new Hono();
 
-const activeResearch = new Map<number, { status: string; report?: any }>();
+const activeResearch = new Map<number, { status: string; report?: any; timestamp: number }>();
 let nextId = 1;
+
+// Cleanup old entries (keep last 100)
+function cleanupResearch() {
+  if (activeResearch.size > 100) {
+    const entries = [...activeResearch.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp);
+    for (const [id] of entries.slice(0, entries.length - 100)) {
+      activeResearch.delete(id);
+    }
+  }
+}
 
 researchRouter.post('/api/research', async (c) => {
   const body = await c.req.json();
@@ -18,7 +28,8 @@ researchRouter.post('/api/research', async (c) => {
   }
 
   const researchId = nextId++;
-  activeResearch.set(researchId, { status: 'running' });
+  activeResearch.set(researchId, { status: 'running', timestamp: Date.now() });
+  cleanupResearch();
 
   const ctx: PipelineContext = {
     query,
@@ -32,16 +43,25 @@ researchRouter.post('/api/research', async (c) => {
     },
   };
 
-  // Run pipeline async — don't block the response
   runPipeline(ctx)
     .then(report => {
-      activeResearch.set(researchId, { status: 'completed', report });
+      activeResearch.set(researchId, { status: 'completed', report, timestamp: Date.now() });
     })
     .catch(err => {
-      activeResearch.set(researchId, { status: 'failed', report: { error: err.message } });
+      activeResearch.set(researchId, { status: 'failed', report: { error: err.message }, timestamp: Date.now() });
     });
 
   return c.json({ research_id: researchId });
+});
+
+// IMPORTANT: history route BEFORE :id to avoid route conflict
+researchRouter.get('/api/research/history', (c) => {
+  const limit = parseInt(c.req.query('limit') || '20', 10);
+  const offset = parseInt(c.req.query('offset') || '0', 10);
+  const db = getDb();
+  const results = db.prepare('SELECT * FROM query_log ORDER BY timestamp DESC LIMIT ? OFFSET ?').all(limit, offset);
+  const total = (db.prepare('SELECT COUNT(*) as count FROM query_log').get() as any).count;
+  return c.json({ results, total });
 });
 
 researchRouter.get('/api/research/:id', (c) => {
@@ -57,13 +77,4 @@ researchRouter.get('/api/research/:id/report', (c) => {
   if (!entry) return c.json({ error: 'Not found' }, 404);
   if (entry.status !== 'completed') return c.json({ error: 'Not ready', status: entry.status }, 202);
   return c.json(entry.report);
-});
-
-researchRouter.get('/api/research/history', (c) => {
-  const limit = parseInt(c.req.query('limit') || '20', 10);
-  const offset = parseInt(c.req.query('offset') || '0', 10);
-  const db = getDb();
-  const results = db.prepare('SELECT * FROM query_log ORDER BY timestamp DESC LIMIT ? OFFSET ?').all(limit, offset);
-  const total = (db.prepare('SELECT COUNT(*) as count FROM query_log').get() as any).count;
-  return c.json({ results, total });
 });

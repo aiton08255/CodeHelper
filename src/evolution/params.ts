@@ -80,7 +80,7 @@ export function updateRoutingWeight(queryType: string, provider: string, delta: 
 export function updateSourceReputation(domain: string, score: number): void {
   const params = loadParams();
   const oldScore = params.source_reputation[domain];
-  const clampedScore = Math.max(0.5 - MAX_REPUTATION_INFLUENCE, Math.min(0.5 + MAX_REPUTATION_INFLUENCE + 0.3, score));
+  const clampedScore = Math.max(0.5 - MAX_REPUTATION_INFLUENCE, Math.min(0.5 + MAX_REPUTATION_INFLUENCE, score));
 
   params.source_reputation[domain] = clampedScore;
   saveParams(params);

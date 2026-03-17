@@ -1,25 +1,5 @@
 -- Self-Evo: Initial schema
-PRAGMA foreign_keys = ON;
-
-CREATE TABLE IF NOT EXISTS claims (
-  id INTEGER PRIMARY KEY,
-  claim_text TEXT NOT NULL,
-  source_id INTEGER REFERENCES sources(id) ON DELETE SET NULL,
-  confidence REAL NOT NULL CHECK(confidence >= 0.0 AND confidence <= 0.95),
-  claim_type TEXT NOT NULL,
-  date_found TEXT NOT NULL,
-  query_id INTEGER REFERENCES query_log(id),
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS claim_tags (
-  claim_id INTEGER REFERENCES claims(id) ON DELETE CASCADE,
-  tag TEXT NOT NULL,
-  PRIMARY KEY (claim_id, tag)
-);
-CREATE INDEX IF NOT EXISTS idx_claim_tags_tag ON claim_tags(tag);
-CREATE INDEX IF NOT EXISTS idx_claims_date ON claims(date_found);
+-- NOTE: PRAGMA foreign_keys is set in connection.ts, not here
 
 CREATE TABLE IF NOT EXISTS sources (
   id INTEGER PRIMARY KEY,
@@ -45,6 +25,26 @@ CREATE TABLE IF NOT EXISTS query_log (
   latency_ms INTEGER,
   timestamp TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS claims (
+  id INTEGER PRIMARY KEY,
+  claim_text TEXT NOT NULL,
+  source_id INTEGER REFERENCES sources(id) ON DELETE SET NULL,
+  confidence REAL NOT NULL CHECK(confidence >= 0.0 AND confidence <= 0.95),
+  claim_type TEXT NOT NULL,
+  date_found TEXT NOT NULL,
+  query_id INTEGER REFERENCES query_log(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_claims_date ON claims(date_found);
+
+CREATE TABLE IF NOT EXISTS claim_tags (
+  claim_id INTEGER REFERENCES claims(id) ON DELETE CASCADE,
+  tag TEXT NOT NULL,
+  PRIMARY KEY (claim_id, tag)
+);
+CREATE INDEX IF NOT EXISTS idx_claim_tags_tag ON claim_tags(tag);
 
 CREATE TABLE IF NOT EXISTS query_providers (
   query_id INTEGER REFERENCES query_log(id) ON DELETE CASCADE,

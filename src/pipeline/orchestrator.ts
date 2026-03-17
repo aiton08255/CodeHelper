@@ -101,7 +101,7 @@ function deduplicateClaims(claims: VerifiedClaim[]): VerifiedClaim[] {
   for (const claim of claims) {
     const key = normalize(claim.claim);
     // Check for exact or near-exact duplicates (first 80 chars match)
-    const shortKey = key.slice(0, 80);
+    const shortKey = key.slice(0, 140);
     const existing = seen.get(shortKey);
 
     if (existing) {

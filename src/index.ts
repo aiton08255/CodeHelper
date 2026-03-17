@@ -62,7 +62,7 @@ async function main() {
     console.log('  └─────────────────────────────────────┘');
     console.log('');
     console.log(`  Server:  http://127.0.0.1:${info.port}`);
-    console.log(`  Token:   ${token}`);
+    console.log(`  Token:   ${token.slice(0, 8)}...${token.slice(-4)}`);
     console.log(`  Data:    ${config.dataDir}`);
     console.log('');
     console.log('  Test with:');
@@ -71,7 +71,7 @@ async function main() {
   });
 
   // WebSocket setup
-  setupWebSocket(server, token);
+  setupWebSocket(server as any, token);
 
   // Graceful shutdown
   const shutdown = () => {

@@ -67,7 +67,7 @@ export function searchClaimsFTS(query: string): ClaimRow[] {
     WHERE c.id IN (SELECT rowid FROM claims_fts WHERE claims_fts MATCH ?)
     ORDER BY c.confidence DESC
     LIMIT 50
-  `).all(query) as any[];
+  `).all(query.split(/\s+/).map(w => `"${w.replace(/"/g, '')}"`).join(' ')) as any[];
 
   return rows.map(r => ({
     ...r,

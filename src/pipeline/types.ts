@@ -31,11 +31,6 @@ export interface VerifiedClaim extends Claim {
   conflicting_claims?: Claim[];
 }
 
-export interface TrìagedSource extends SearchResult {
-  quality_score: number;
-  domain_tier: 'high' | 'medium' | 'low';
-  freshness_score: number;
-}
 
 export interface ResearchReport {
   query: string;
