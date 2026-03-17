@@ -1,4 +1,5 @@
 import { LLMResponse } from './types.js';
+import { anonFetch, anonApiHeaders } from '../privacy/anonymizer.js';
 
 const BASE_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -11,12 +12,9 @@ export async function groqChat(
   const timer = setTimeout(() => controller.abort(), options.timeout || 15_000);
 
   try {
-    const res = await fetch(BASE_URL, {
+    const res = await anonFetch(BASE_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
+      headers: anonApiHeaders({ 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }),
       body: JSON.stringify({
         model: options.model || 'llama-3.3-70b-versatile',
         messages,

@@ -1,10 +1,12 @@
+import { anonFetch, anonHeaders } from '../privacy/anonymizer.js';
+
 export async function webFetchPage(url: string, options: { timeout?: number } = {}): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeout || 15_000);
 
   try {
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SelfEvo/1.0)' },
+    const res = await anonFetch(url, {
+      headers: anonHeaders(),
       signal: controller.signal,
     });
     if (!res.ok) throw new Error(`WebFetch ${url}: ${res.status}`);

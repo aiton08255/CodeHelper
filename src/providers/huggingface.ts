@@ -4,6 +4,7 @@
  */
 
 import { LLMResponse } from './types.js';
+import { anonFetch, anonApiHeaders } from '../privacy/anonymizer.js';
 
 const API_URL = 'https://api-inference.huggingface.co/models';
 
@@ -31,9 +32,9 @@ export async function huggingfaceChat(
       return `<|assistant|>${m.content}`;
     }).join('\n') + '\n<|assistant|>';
 
-    const res = await fetch(`${API_URL}/${selectedModel}`, {
+    const res = await anonFetch(`${API_URL}/${selectedModel}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: anonApiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         inputs: prompt,
         parameters: { max_new_tokens: 2048, temperature: 0.7 },

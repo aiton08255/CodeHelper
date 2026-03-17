@@ -5,6 +5,7 @@
  */
 
 import { LLMResponse } from './types.js';
+import { anonFetch, anonApiHeaders } from '../privacy/anonymizer.js';
 
 const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -32,9 +33,9 @@ export async function googleAIChat(
       ? { parts: [{ text: systemMsg.content }] }
       : undefined;
 
-    const res = await fetch(`${API_URL}/${model}:generateContent?key=${apiKey}`, {
+    const res = await anonFetch(`${API_URL}/${model}:generateContent?key=${apiKey}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: anonApiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         contents,
         ...(systemInstruction && { systemInstruction }),
@@ -79,9 +80,9 @@ export async function googleAIGroundedSearch(
   const timer = setTimeout(() => controller.abort(), options.timeout || 30_000);
 
   try {
-    const res = await fetch(`${API_URL}/${model}:generateContent?key=${apiKey}`, {
+    const res = await anonFetch(`${API_URL}/${model}:generateContent?key=${apiKey}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: anonApiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: query }] }],
         tools: [{ googleSearch: {} }],

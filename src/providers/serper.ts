@@ -1,4 +1,5 @@
 import { SearchResult } from './types.js';
+import { anonFetch, anonApiHeaders } from '../privacy/anonymizer.js';
 
 const BASE_URL = 'https://google.serper.dev/search';
 
@@ -11,9 +12,9 @@ export async function serperSearch(
   const timer = setTimeout(() => controller.abort(), options.timeout || 10_000);
 
   try {
-    const res = await fetch(BASE_URL, {
+    const res = await anonFetch(BASE_URL, {
       method: 'POST',
-      headers: { 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
+      headers: anonApiHeaders({ 'X-API-KEY': apiKey, 'Content-Type': 'application/json' }),
       body: JSON.stringify({ q: query, num: options.num || 5 }),
       signal: controller.signal,
     });

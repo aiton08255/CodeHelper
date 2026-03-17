@@ -1,4 +1,5 @@
 import { SearchResult } from './types.js';
+import { anonFetch, anonApiHeaders } from '../privacy/anonymizer.js';
 
 const BASE_URL = 'https://api.exa.ai/search';
 
@@ -11,9 +12,9 @@ export async function exaSearch(
   const timer = setTimeout(() => controller.abort(), options.timeout || 10_000);
 
   try {
-    const res = await fetch(BASE_URL, {
+    const res = await anonFetch(BASE_URL, {
       method: 'POST',
-      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      headers: anonApiHeaders({ 'x-api-key': apiKey, 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         query,
         type: 'auto',

@@ -5,6 +5,7 @@
  */
 
 import { LLMResponse } from './types.js';
+import { anonFetch, anonApiHeaders } from '../privacy/anonymizer.js';
 
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -25,13 +26,9 @@ export async function openrouterChat(
   const timer = setTimeout(() => controller.abort(), options.timeout || 25_000);
 
   try {
-    const res = await fetch(API_URL, {
+    const res = await anonFetch(API_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'http://localhost:13742',
-        'X-Title': 'Self-Evo Research',
-      },
+      headers: anonApiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         model: model || FREE_MODELS[0],
         messages,

@@ -1,4 +1,5 @@
 import { SearchResult } from './types.js';
+import { anonFetch, anonHeaders } from '../privacy/anonymizer.js';
 
 /**
  * DuckDuckGo search using the Instant Answer API (JSON, no scraping).
@@ -20,9 +21,10 @@ export async function ddgSearch(query: string, options: { limit?: number; timeou
       skip_disambig: '1',
     });
 
-    const res = await fetch(`${API_URL}?${params}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SelfEvo/1.0)' },
+    const res = await anonFetch(`${API_URL}?${params}`, {
+      headers: anonHeaders(),
       signal: controller.signal,
+      skipJitter: true,
     });
     const data = await res.json();
     const results: SearchResult[] = [];
