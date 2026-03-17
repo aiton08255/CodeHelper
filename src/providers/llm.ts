@@ -1,12 +1,12 @@
 /**
  * Unified LLM call with automatic fallback chain.
- * Eliminates the repeated try/groq → catch/pollinations pattern
- * that was duplicated across 5 pipeline stages.
+ * 8 providers: Groq, Pollinations (30+ models), Mistral, OpenRouter (24+ free models)
  */
 
 import { groqChat } from './groq.js';
 import { pollinationsChat } from './pollinations.js';
 import { mistralChat } from './mistral.js';
+import { openrouterChat } from './openrouter.js';
 import { incrementQuota } from '../quotas/tracker.js';
 
 interface LLMMessage {
@@ -15,11 +15,8 @@ interface LLMMessage {
 }
 
 interface LLMOptions {
-  /** Which model tier to prefer */
   tier: 'fast' | 'reason' | 'compose';
-  /** API keys */
   keys: Record<string, string>;
-  /** Timeout per attempt in ms */
   timeout?: number;
 }
 
@@ -28,20 +25,24 @@ interface LLMResult {
   provider: string;
 }
 
+// Deeper fallback chains with more providers for resilience
 const TIER_CHAINS: Record<string, { provider: string; model?: string }[]> = {
   fast: [
     { provider: 'groq' },
     { provider: 'pollinations', model: 'openai-fast' },
+    { provider: 'openrouter', model: 'meta-llama/llama-3.3-70b-instruct:free' },
     { provider: 'mistral' },
   ],
   reason: [
     { provider: 'pollinations', model: 'perplexity-reasoning' },
     { provider: 'pollinations', model: 'deepseek' },
+    { provider: 'openrouter', model: 'qwen/qwen3-235b-a22b:free' },
     { provider: 'groq' },
   ],
   compose: [
     { provider: 'mistral' },
     { provider: 'pollinations', model: 'openai-large' },
+    { provider: 'openrouter', model: 'google/gemma-3-27b-it:free' },
     { provider: 'groq' },
   ],
 };
@@ -66,6 +67,9 @@ export async function llmCall(messages: LLMMessage[], opts: LLMOptions): Promise
         case 'mistral':
           if (!opts.keys.mistral) continue;
           content = (await mistralChat(messages, opts.keys.mistral, { timeout })).content;
+          break;
+        case 'openrouter':
+          content = (await openrouterChat(messages, link.model, { timeout })).content;
           break;
         default:
           continue;
