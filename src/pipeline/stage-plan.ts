@@ -1,24 +1,11 @@
 import { ResearchPlan, Claim, SubQuestion } from './types.js';
 import type { PipelineContext } from './orchestrator.js';
-import { groqChat } from '../providers/groq.js';
-import { pollinationsChat } from '../providers/pollinations.js';
+import { llmCall } from '../providers/llm.js';
 import { canAfford } from '../quotas/tracker.js';
+import { extractJsonObject } from '../utils/safe-json.js';
 
-const PLAN_PROMPT = `You are a research planner. Given a query, decompose it into 2-5 sub-questions that together would fully answer the query.
-
-For each sub-question, assign:
-- strategy: one of "semantic", "keyword", "news", "docs", "crawl", "reason"
-- temporal: "recent" if needs current data, "any" if established knowledge is fine
-
-Classify the overall query intent as: factual, comparison, trend, technical, or opinion
-
-Respond in JSON only:
-{
-  "intent": "factual|comparison|trend|technical|opinion",
-  "sub_questions": [
-    { "question": "...", "strategy": "keyword", "temporal": "any" }
-  ]
-}`;
+const PLAN_PROMPT = `Decompose query into 2-5 sub-questions. Assign strategy(semantic/keyword/news/docs/crawl/reason) and temporal(recent/any) to each. Classify intent: factual/comparison/trend/technical/opinion.
+JSON only: {"intent":"...", "sub_questions":[{"question":"...", "strategy":"keyword", "temporal":"any"}]}`;
 
 const STRATEGY_TO_PROVIDER: Record<string, string> = {
   semantic: 'exa',
@@ -34,35 +21,26 @@ export async function stagePlan(ctx: PipelineContext, priorKnowledge: Claim[]): 
     ? `\n\nI already know these facts (skip searching for these):\n${priorKnowledge.map(c => `- ${c.claim} [confidence: ${c.confidence}]`).join('\n')}`
     : '';
 
-  let parsed: any;
+  let parsed: Record<string, unknown> | null;
 
   try {
-    const response = ctx.keys.groq
-      ? await groqChat(
-          [{ role: 'system', content: PLAN_PROMPT }, { role: 'user', content: ctx.query + priorContext }],
-          ctx.keys.groq,
-          { timeout: 10_000 }
-        )
-      : await pollinationsChat(
-          [{ role: 'system', content: PLAN_PROMPT }, { role: 'user', content: ctx.query + priorContext }],
-          'openai-fast',
-          { timeout: 15_000 }
-        );
-
-    const jsonMatch = response.content.match(/\{[\s\S]*\}/);
-    parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+    const response = await llmCall(
+      [{ role: 'system', content: PLAN_PROMPT }, { role: 'user', content: ctx.query + priorContext }],
+      { tier: 'fast', keys: ctx.keys, timeout: 10_000 }
+    );
+    parsed = extractJsonObject(response.content);
   } catch {
     parsed = null;
   }
 
-  if (!parsed || !parsed.sub_questions?.length) {
+  if (!parsed || !(parsed.sub_questions as any[])?.length) {
     parsed = {
       intent: 'factual',
       sub_questions: [{ question: ctx.query, strategy: 'keyword', temporal: 'any' }],
     };
   }
 
-  const sub_questions: SubQuestion[] = parsed.sub_questions.map((sq: any) => ({
+  const sub_questions: SubQuestion[] = (parsed.sub_questions as any[]).map((sq: any) => ({
     question: sq.question,
     strategy: sq.strategy || 'keyword',
     provider: STRATEGY_TO_PROVIDER[sq.strategy] || 'duckduckgo',
@@ -79,7 +57,7 @@ export async function stagePlan(ctx: PipelineContext, priorKnowledge: Claim[]): 
   }
 
   return {
-    intent: parsed.intent || 'factual',
+    intent: ((parsed.intent as string) || 'factual') as ResearchPlan['intent'],
     sub_questions,
     budget: {},
     depth: ctx.depth,

@@ -1,13 +1,23 @@
 import { useState } from 'react';
 
+type Depth = 'auto' | 'instant' | 'quick' | 'standard' | 'deep';
+
+const DEPTH_INFO: Record<Depth, { label: string; hint: string }> = {
+  auto:     { label: 'Auto',     hint: 'Smart — picks the right depth' },
+  instant:  { label: 'Instant',  hint: '~2s — simple facts' },
+  quick:    { label: 'Quick',    hint: '~10s — moderate questions' },
+  standard: { label: 'Standard', hint: '~20s — comparisons & analysis' },
+  deep:     { label: 'Deep',     hint: '~35s — full research' },
+};
+
 interface Props {
-  onSearch: (query: string, depth: 'quick' | 'standard' | 'deep') => void;
+  onSearch: (query: string, depth: Depth) => void;
   disabled?: boolean;
 }
 
 export function SearchBar({ onSearch, disabled }: Props) {
   const [query, setQuery] = useState('');
-  const [depth, setDepth] = useState<'quick' | 'standard' | 'deep'>('standard');
+  const [depth, setDepth] = useState<Depth>('auto');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,7 +33,7 @@ export function SearchBar({ onSearch, disabled }: Props) {
           type="text"
           value={query}
           onChange={e => setQuery(e.target.value)}
-          placeholder="Ask anything... (e.g., compare Rust vs Go for web servers)"
+          placeholder="Ask anything..."
           disabled={disabled}
           className="w-full px-5 py-4 pr-28 bg-slate-800 border border-slate-600 rounded-2xl text-white placeholder-slate-400 text-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
         />
@@ -36,22 +46,24 @@ export function SearchBar({ onSearch, disabled }: Props) {
         </button>
       </div>
 
-      <div className="flex gap-2 mt-3 justify-center">
-        {(['quick', 'standard', 'deep'] as const).map(d => (
+      <div className="flex gap-2 mt-3 justify-center flex-wrap">
+        {(Object.keys(DEPTH_INFO) as Depth[]).map(d => (
           <button
             key={d}
             type="button"
             onClick={() => setDepth(d)}
+            title={DEPTH_INFO[d].hint}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               depth === d
                 ? 'bg-blue-600 text-white'
                 : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
             }`}
           >
-            {d.charAt(0).toUpperCase() + d.slice(1)}
+            {DEPTH_INFO[d].label}
           </button>
         ))}
       </div>
+      <p className="text-center text-xs text-slate-500 mt-1">{DEPTH_INFO[depth].hint}</p>
     </form>
   );
 }

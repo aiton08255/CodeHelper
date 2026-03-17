@@ -55,7 +55,6 @@ export function LiveProgress({ events, currentStage }: Props) {
           {STAGE_ORDER.map(stage => {
             const isCompleted = completedStages.has(stage);
             const isCurrent = currentStage === stage;
-            const isPending = !isCompleted && !isCurrent;
 
             return (
               <div key={stage} className="flex items-center gap-3">

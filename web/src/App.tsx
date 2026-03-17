@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { SearchBar } from './components/SearchBar';
 import { LiveProgress } from './components/LiveProgress';
 import { Report } from './components/Report';
+import { Dashboard } from './components/Dashboard';
 import { startResearch, getResearch, connectWebSocket, setToken, getToken, checkHealth } from './lib/api';
 import './App.css';
 
-type View = 'search' | 'progress' | 'report';
+type View = 'search' | 'progress' | 'report' | 'dashboard';
 
 function App() {
   const [view, setView] = useState<View>('search');
@@ -54,7 +55,7 @@ function App() {
     return () => { ws?.close(); };
   }, [researchId]);
 
-  const handleSearch = useCallback(async (query: string, depth: 'quick' | 'standard' | 'deep') => {
+  const handleSearch = useCallback(async (query: string, depth: string) => {
     setEvents([]);
     setCurrentStage('');
     setReport(null);
@@ -141,20 +142,33 @@ function App() {
         <p className="text-slate-400 text-sm">
           Deep Research Engine
           <span className={`ml-2 inline-block w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
+          <button
+            onClick={() => setView(view === 'dashboard' ? 'search' : 'dashboard')}
+            className="ml-3 text-slate-500 hover:text-blue-400 transition-colors"
+          >
+            {view === 'dashboard' ? '[Search]' : '[Stats]'}
+          </button>
         </p>
       </header>
 
-      {/* Search always visible */}
-      <SearchBar onSearch={handleSearch} disabled={view === 'progress'} />
-
-      {/* Live progress */}
-      {view === 'progress' && (
-        <LiveProgress events={events} currentStage={currentStage} />
+      {/* Dashboard */}
+      {view === 'dashboard' && (
+        <Dashboard onClose={() => setView('search')} />
       )}
 
-      {/* Report */}
-      {view === 'report' && report && (
-        <Report report={report} onNewSearch={() => setView('search')} />
+      {/* Search + Results */}
+      {view !== 'dashboard' && (
+        <>
+          <SearchBar onSearch={handleSearch} disabled={view === 'progress'} />
+
+          {view === 'progress' && (
+            <LiveProgress events={events} currentStage={currentStage} />
+          )}
+
+          {view === 'report' && report && (
+            <Report report={report} onNewSearch={() => setView('search')} />
+          )}
+        </>
       )}
 
       {/* Footer */}

@@ -12,7 +12,7 @@ export interface ResearchPlan {
   intent: 'factual' | 'comparison' | 'trend' | 'technical' | 'opinion';
   sub_questions: SubQuestion[];
   budget: Record<string, number>;
-  depth: 'quick' | 'standard' | 'deep';
+  depth: string;
 }
 
 export interface Claim {

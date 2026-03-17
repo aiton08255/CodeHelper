@@ -1,83 +1,90 @@
 import { SearchResult } from './types.js';
 
-// Use DuckDuckGo lite endpoint — simpler HTML, more stable markup
-const LITE_URL = 'https://lite.duckduckgo.com/lite/';
+/**
+ * DuckDuckGo search using the Instant Answer API (JSON, no scraping).
+ * Falls back to the abstract API if no results.
+ * Note: This returns fewer results than scraping but is reliable.
+ */
+const API_URL = 'https://api.duckduckgo.com/';
 
 export async function ddgSearch(query: string, options: { limit?: number; timeout?: number } = {}): Promise<SearchResult[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeout || 10_000);
 
   try {
-    const res = await fetch(LITE_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (compatible; SelfEvo/1.0)',
-      },
-      body: `q=${encodeURIComponent(query)}`,
+    // DDG Instant Answer API — returns structured JSON
+    const params = new URLSearchParams({
+      q: query,
+      format: 'json',
+      no_html: '1',
+      skip_disambig: '1',
+    });
+
+    const res = await fetch(`${API_URL}?${params}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SelfEvo/1.0)' },
       signal: controller.signal,
     });
-    const html = await res.text();
-    return parseLiteResults(html, options.limit || 8);
+    const data = await res.json();
+    const results: SearchResult[] = [];
+    const limit = options.limit || 8;
+
+    // Abstract (Wikipedia-style summary)
+    if (data.AbstractText && data.AbstractURL) {
+      results.push({
+        url: data.AbstractURL,
+        title: data.Heading || query,
+        snippet: data.AbstractText.slice(0, 300),
+        provider: 'duckduckgo',
+      });
+    }
+
+    // Related topics
+    if (data.RelatedTopics) {
+      for (const topic of data.RelatedTopics.slice(0, limit - results.length)) {
+        if (topic.FirstURL && topic.Text) {
+          results.push({
+            url: topic.FirstURL,
+            title: topic.Text.split(' - ')[0]?.slice(0, 100) || '',
+            snippet: topic.Text.slice(0, 300),
+            provider: 'duckduckgo',
+          });
+        }
+        // Nested topics (sub-categories)
+        if (topic.Topics) {
+          for (const sub of topic.Topics.slice(0, 3)) {
+            if (sub.FirstURL && sub.Text) {
+              results.push({
+                url: sub.FirstURL,
+                title: sub.Text.split(' - ')[0]?.slice(0, 100) || '',
+                snippet: sub.Text.slice(0, 300),
+                provider: 'duckduckgo',
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Results section
+    if (data.Results) {
+      for (const r of data.Results.slice(0, limit - results.length)) {
+        if (r.FirstURL && r.Text) {
+          results.push({
+            url: r.FirstURL,
+            title: r.Text.split(' - ')[0]?.slice(0, 100) || '',
+            snippet: r.Text.slice(0, 300),
+            provider: 'duckduckgo',
+          });
+        }
+      }
+    }
+
+    return results.slice(0, limit);
   } finally {
     clearTimeout(timer);
   }
 }
 
 export async function ddgNewsSearch(query: string, options: { limit?: number; timeout?: number } = {}): Promise<SearchResult[]> {
-  // DDG lite doesn't have a news mode, so we append "news" to query
-  return ddgSearch(`${query} news latest`, options);
-}
-
-function parseLiteResults(html: string, limit: number): SearchResult[] {
-  const results: SearchResult[] = [];
-
-  // DuckDuckGo lite uses simple table rows with class "result-link" for URLs
-  // and plain <td> cells for snippets. Parse using multiple strategies.
-
-  // Strategy 1: Find all links in result rows
-  // DDG lite format: <a rel="nofollow" href="URL" class="result-link">TITLE</a>
-  const linkRegex = /<a[^>]*class="result-link"[^>]*href="([^"]+)"[^>]*>([^<]*)<\/a>/gi;
-  const snippetRegex = /<td class="result-snippet">([\s\S]*?)<\/td>/gi;
-
-  const links: { url: string; title: string }[] = [];
-  const snippets: string[] = [];
-
-  let match;
-  while ((match = linkRegex.exec(html)) !== null) {
-    links.push({ url: match[1], title: match[2].trim() });
-  }
-  while ((match = snippetRegex.exec(html)) !== null) {
-    snippets.push(match[1].replace(/<[^>]+>/g, '').trim());
-  }
-
-  // Strategy 2 fallback: if result-link class not found, try generic href pattern
-  if (links.length === 0) {
-    const genericRegex = /<a[^>]*rel="nofollow"[^>]*href="(https?:\/\/[^"]+)"[^>]*>([^<]+)<\/a>/gi;
-    while ((match = genericRegex.exec(html)) !== null) {
-      const url = match[1];
-      // Skip DDG internal links
-      if (url.includes('duckduckgo.com')) continue;
-      links.push({ url, title: match[2].trim() });
-    }
-  }
-
-  // Strategy 3 fallback: extract any external URLs
-  if (links.length === 0) {
-    const urlRegex = /href="(https?:\/\/(?!.*duckduckgo\.com)[^"]+)"/gi;
-    while ((match = urlRegex.exec(html)) !== null && links.length < limit) {
-      links.push({ url: match[1], title: '' });
-    }
-  }
-
-  for (let i = 0; i < Math.min(links.length, limit); i++) {
-    results.push({
-      url: links[i].url,
-      title: links[i].title || `Result ${i + 1}`,
-      snippet: snippets[i] || '',
-      provider: 'duckduckgo',
-    });
-  }
-
-  return results;
+  return ddgSearch(`${query} news latest 2025`, options);
 }

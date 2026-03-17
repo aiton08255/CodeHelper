@@ -67,6 +67,7 @@ export function getAllQuotas(): QuotaStatus[] {
 
 export function estimateBudget(depth: string): Record<string, number> {
   const budgets: Record<string, Record<string, number>> = {
+    instant: { exa: 1, serper: 0, groq: 1, pollinations: 0, mistral: 0 },
     quick: { exa: 2, serper: 0, groq: 3, pollinations: 2, mistral: 1 },
     standard: { exa: 5, serper: 1, groq: 6, pollinations: 5, mistral: 3 },
     deep: { exa: 10, serper: 2, groq: 10, pollinations: 10, mistral: 5 },

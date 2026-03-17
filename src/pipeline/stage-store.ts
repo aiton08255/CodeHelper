@@ -4,6 +4,7 @@ import { getDb } from '../db/connection.js';
 import { insertClaim } from '../memory/claims.js';
 import { upsertSource } from '../memory/sources.js';
 import { updateRoutingWeight } from '../evolution/params.js';
+import { analyzeAndLearn } from '../evolution/analyzer.js';
 
 export async function stageStore(
   ctx: PipelineContext,
@@ -42,7 +43,7 @@ export async function stageStore(
     insertClaim({
       claim_text: claim.claim,
       source_id: sourceId,
-      confidence: Math.min(0.95, claim.verified_confidence || claim.confidence),
+      confidence: Math.min(0.95, claim.verified_confidence || claim.confidence || 0.5),
       claim_type: claim.claim_type,
       date_found: new Date().toISOString().slice(0, 10),
       query_id: queryId,
@@ -74,12 +75,22 @@ export async function stageStore(
     JSON.stringify({ depth: ctx.depth, claims_count: claims.length, duration_ms: durationMs })
   );
 
-  // 5. Lightweight self-evolution: update provider routing based on result quality
+  // 5. Self-evolution: analyze results and learn
+  analyzeAndLearn({
+    query: ctx.query,
+    depth: ctx.depth,
+    duration_ms: durationMs,
+    claim_count: claims.length,
+    source_count: report.sources.length,
+    overall_confidence: report.overall_confidence,
+    sources: report.sources,
+  });
+
+  // 6. Routing nudge for good results
   if (report.overall_confidence > 0.7) {
-    // Good results — slightly boost the providers used
     const usedProviders = claims.map(c => c.source_url?.includes('exa.ai') ? 'exa' : 'duckduckgo');
     for (const p of new Set(usedProviders)) {
-      updateRoutingWeight('general', p, 0.01); // small positive nudge
+      updateRoutingWeight('general', p, 0.01);
     }
   }
 }

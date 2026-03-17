@@ -17,6 +17,7 @@ import { claimsRouter } from './routes/claims.js';
 import { quotasRouter } from './routes/quotas.js';
 import { evolutionRouter } from './routes/evolution.js';
 import { healthRouter } from './routes/health.js';
+import { absorbRouter } from './routes/absorb.js';
 
 async function main() {
   // Initialize data directory and defaults
@@ -53,6 +54,7 @@ async function main() {
   app.route('/', claimsRouter);
   app.route('/', quotasRouter);
   app.route('/', evolutionRouter);
+  app.route('/', absorbRouter);
 
   // Start server
   const server = serve({ fetch: app.fetch, port, hostname: '127.0.0.1' }, (info) => {

@@ -32,7 +32,7 @@ export async function checkHealth() {
   return res.json();
 }
 
-export async function startResearch(query: string, depth: 'quick' | 'standard' | 'deep') {
+export async function startResearch(query: string, depth: string) {
   return apiFetch('/research', {
     method: 'POST',
     body: JSON.stringify({ query, depth }),

@@ -2,7 +2,6 @@ import { QueryType, SearchResult } from './types.js';
 import { ddgSearch, ddgNewsSearch } from './duckduckgo.js';
 import { exaSearch } from './exa.js';
 import { serperSearch } from './serper.js';
-import { webFetchPage } from './webfetch.js';
 
 interface RoutingEntry {
   primary: string;
@@ -14,7 +13,7 @@ const ROUTING_TABLE: Record<QueryType, RoutingEntry> = {
   news:          { primary: 'duckduckgo:news', secondary: 'pollinations:gemini-search', fallback: 'duckduckgo' },
   academic:      { primary: 'exa',             secondary: 'duckduckgo',                 fallback: 'duckduckgo' },
   code:          { primary: 'duckduckgo',      secondary: 'exa',                        fallback: 'duckduckgo' },
-  general:       { primary: 'duckduckgo',      secondary: 'exa',                        fallback: 'serper' },
+  general:       { primary: 'exa',              secondary: 'duckduckgo',                 fallback: 'serper' },
   page_read:     { primary: 'webfetch',        secondary: 'exa:crawl',                  fallback: 'serper:scrape' },
   fast_reason:   { primary: 'groq',            secondary: 'pollinations:openai-fast',   fallback: 'mistral' },
   deep_reason:   { primary: 'pollinations:perplexity-reasoning', secondary: 'pollinations:deepseek', fallback: 'mistral' },
@@ -47,10 +46,6 @@ export async function executeSearch(
     default:
       return [];
   }
-}
-
-export async function executeFetchPage(url: string): Promise<string> {
-  return webFetchPage(url);
 }
 
 export { ROUTING_TABLE };

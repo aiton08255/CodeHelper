@@ -23,8 +23,8 @@ researchRouter.post('/api/research', async (c) => {
   const { query, depth = 'standard' } = body;
 
   if (!query) return c.json({ error: 'query required' }, 400);
-  if (!['quick', 'standard', 'deep'].includes(depth)) {
-    return c.json({ error: 'depth must be quick, standard, or deep' }, 400);
+  if (!['instant', 'quick', 'standard', 'deep', 'auto'].includes(depth)) {
+    return c.json({ error: 'depth must be instant, quick, standard, deep, or auto' }, 400);
   }
 
   const researchId = nextId++;

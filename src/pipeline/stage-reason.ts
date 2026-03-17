@@ -1,26 +1,10 @@
 import { VerifiedClaim, ReasoningOutline } from './types.js';
 import type { PipelineContext } from './orchestrator.js';
-import { pollinationsChat } from '../providers/pollinations.js';
-import { groqChat } from '../providers/groq.js';
-import { incrementQuota } from '../quotas/tracker.js';
+import { llmCall } from '../providers/llm.js';
+import { extractJsonObject } from '../utils/safe-json.js';
 
-const REASON_PROMPT = `You are a research analyst. Given verified claims about a topic, build a structured analysis.
-
-Determine:
-1. The best narrative structure (chronological, comparison, problem_solution, pros_cons, factual)
-2. Rank findings by importance and confidence
-3. Identify caveats or limitations
-4. Assign overall confidence (0.3-0.95)
-
-Return JSON:
-{
-  "narrative_type": "comparison",
-  "ranked_findings": [
-    { "finding": "key insight", "confidence": 0.85 }
-  ],
-  "caveats": ["limitation 1"],
-  "overall_confidence": 0.78
-}`;
+const REASON_PROMPT = `Analyze verified claims. Pick narrative(chronological/comparison/problem_solution/pros_cons/factual), rank findings by importance, list caveats, assign confidence 0.3-0.95.
+JSON: {"narrative_type":"...", "ranked_findings":[{"finding":"...", "confidence":0.85}], "caveats":["..."], "overall_confidence":0.78}`;
 
 export async function stageReason(ctx: PipelineContext, claims: VerifiedClaim[]): Promise<ReasoningOutline> {
   if (claims.length === 0) {
@@ -32,40 +16,24 @@ export async function stageReason(ctx: PipelineContext, claims: VerifiedClaim[])
   ).join('\n');
 
   try {
-    let response;
-    try {
-      response = await pollinationsChat(
-        [{ role: 'system', content: REASON_PROMPT },
-         { role: 'user', content: `Query: "${ctx.query}"\n\nVerified claims:\n${claimsSummary}` }],
-        'deepseek',
-        { timeout: 30_000 }
-      );
-      incrementQuota('pollinations');
-    } catch {
-      if (ctx.keys.groq) {
-        response = await groqChat(
-          [{ role: 'system', content: REASON_PROMPT },
-           { role: 'user', content: `Query: "${ctx.query}"\n\nVerified claims:\n${claimsSummary}` }],
-          ctx.keys.groq,
-          { timeout: 20_000 }
-        );
-        incrementQuota('groq');
-      } else {
-        throw new Error('No reasoning provider available');
-      }
-    }
+    const response = await llmCall(
+      [{ role: 'system', content: REASON_PROMPT },
+       { role: 'user', content: `Query: "${ctx.query}"\n\nVerified claims:\n${claimsSummary}` }],
+      { tier: 'reason', keys: ctx.keys, timeout: 30_000 }
+    );
 
-    const jsonMatch = response.content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
+    const parsed = extractJsonObject(response.content);
+    if (parsed) {
       return {
-        narrative_type: parsed.narrative_type || 'factual',
-        ranked_findings: parsed.ranked_findings || [],
-        caveats: parsed.caveats || [],
-        overall_confidence: Math.min(0.95, parsed.overall_confidence || 0.5),
+        narrative_type: ((parsed.narrative_type as string) || 'factual') as ReasoningOutline['narrative_type'],
+        ranked_findings: (parsed.ranked_findings as any[]) || [],
+        caveats: (parsed.caveats as string[]) || [],
+        overall_confidence: Math.min(0.95, (parsed.overall_confidence as number) || 0.5),
       };
     }
-  } catch {}
+  } catch (err) {
+    ctx.emit({ type: 'error', message: `Reasoning failed: ${(err as Error).message}`, recoverable: true });
+  }
 
   // Fallback: basic outline from claims
   return {
