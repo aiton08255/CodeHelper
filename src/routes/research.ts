@@ -40,6 +40,7 @@ researchRouter.post('/api/research', async (c) => {
       serper: process.env.SERPER_API_KEY || '',
       groq: process.env.GROQ_API_KEY || '',
       mistral: process.env.MISTRAL_API_KEY || '',
+      googleai: process.env.GOOGLE_AI_KEY || '',
     },
   };
 

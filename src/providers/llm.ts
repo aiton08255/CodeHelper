@@ -7,6 +7,7 @@ import { groqChat } from './groq.js';
 import { pollinationsChat } from './pollinations.js';
 import { mistralChat } from './mistral.js';
 import { openrouterChat } from './openrouter.js';
+import { googleAIChat } from './google-ai.js';
 import { incrementQuota } from '../quotas/tracker.js';
 
 interface LLMMessage {
@@ -29,17 +30,20 @@ interface LLMResult {
 const TIER_CHAINS: Record<string, { provider: string; model?: string }[]> = {
   fast: [
     { provider: 'groq' },
+    { provider: 'google-ai', model: 'gemini-2.0-flash' },
     { provider: 'pollinations', model: 'openai-fast' },
     { provider: 'openrouter', model: 'meta-llama/llama-3.3-70b-instruct:free' },
     { provider: 'mistral' },
   ],
   reason: [
     { provider: 'pollinations', model: 'perplexity-reasoning' },
+    { provider: 'google-ai', model: 'gemini-2.5-pro' },
     { provider: 'pollinations', model: 'deepseek' },
     { provider: 'openrouter', model: 'qwen/qwen3-235b-a22b:free' },
     { provider: 'groq' },
   ],
   compose: [
+    { provider: 'google-ai', model: 'gemini-2.0-flash' },
     { provider: 'mistral' },
     { provider: 'pollinations', model: 'openai-large' },
     { provider: 'openrouter', model: 'google/gemma-3-27b-it:free' },
@@ -70,6 +74,10 @@ export async function llmCall(messages: LLMMessage[], opts: LLMOptions): Promise
           break;
         case 'openrouter':
           content = (await openrouterChat(messages, link.model, { timeout })).content;
+          break;
+        case 'google-ai':
+          if (!opts.keys.googleai) continue;
+          content = (await googleAIChat(messages, opts.keys.googleai, { model: link.model, timeout })).content;
           break;
         default:
           continue;

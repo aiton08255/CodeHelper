@@ -16,7 +16,8 @@ const PROVIDER_LIMITS: Record<string, { limit: number; period: 'daily' | 'monthl
   pollinations: { limit: 200, period: 'daily' },
   mistral: { limit: 100000, period: 'monthly' },
   duckduckgo: { limit: 150, period: 'daily' },
-  openrouter: { limit: 200, period: 'daily' }, // free tier ~500k tokens/month
+  openrouter: { limit: 200, period: 'daily' },
+  'google-ai': { limit: 1500, period: 'daily' }, // free: 15 RPM, 1500 req/day
 };
 
 function getCurrentPeriodStart(period: 'daily' | 'monthly' | 'lifetime'): string {

@@ -54,6 +54,7 @@ evolutionRouter.post('/api/evolution/discover', async (c) => {
     serper: process.env.SERPER_API_KEY || '',
     groq: process.env.GROQ_API_KEY || '',
     mistral: process.env.MISTRAL_API_KEY || '',
+    googleai: process.env.GOOGLE_AI_KEY || '',
   };
   const result = await discoverTools(keys);
   return c.json(result);
