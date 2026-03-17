@@ -7,12 +7,19 @@ import { incrementQuota, checkQuota } from '../quotas/tracker.js';
 export async function stageSearch(ctx: PipelineContext, plan: ResearchPlan): Promise<SearchResult[]> {
   const allResults: SearchResult[] = [];
 
-  // Group sub-questions by provider for efficiency
+  // Group sub-questions by provider
   const providerGroups = new Map<string, string[]>();
   for (const sq of plan.sub_questions) {
     const provider = sq.provider;
     if (!providerGroups.has(provider)) providerGroups.set(provider, []);
     providerGroups.get(provider)!.push(sq.question);
+  }
+
+  // For standard/deep depth, also add Exa semantic search on the main query
+  // This gives us both keyword (DDG) and semantic (Exa) results
+  if (ctx.depth !== 'quick' && ctx.keys.exa && !checkQuota('exa').exhausted) {
+    if (!providerGroups.has('exa')) providerGroups.set('exa', []);
+    providerGroups.get('exa')!.push(ctx.query);
   }
 
   // Execute all provider groups in parallel
@@ -21,7 +28,6 @@ export async function stageSearch(ctx: PipelineContext, plan: ResearchPlan): Pro
   for (const [provider, questions] of providerGroups) {
     const [providerName] = provider.split(':');
 
-    // Check quota before searching
     const quota = checkQuota(providerName);
     if (quota.exhausted) {
       ctx.emit({ type: 'quota-warning', provider: providerName, usage_pct: 100 });

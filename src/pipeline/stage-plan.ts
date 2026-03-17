@@ -24,7 +24,7 @@ const STRATEGY_TO_PROVIDER: Record<string, string> = {
   semantic: 'exa',
   keyword: 'duckduckgo',
   news: 'duckduckgo:news',
-  docs: 'duckduckgo',
+  docs: 'exa',
   crawl: 'webfetch',
   reason: 'pollinations:gemini-search',
 };

@@ -6,24 +6,33 @@ import { groqChat } from '../providers/groq.js';
 import { pollinationsChat } from '../providers/pollinations.js';
 import { incrementQuota } from '../quotas/tracker.js';
 
-const EXTRACT_PROMPT = `Extract key claims from this web page content related to the research query.
+const EXTRACT_PROMPT = `You are a research analyst extracting factual claims from web content.
 
-Return a JSON array of claims:
+Extract claims that are DIRECTLY relevant to the research query. Be thorough — don't just grab surface-level facts.
+
+For each claim:
+- **Be specific**: include exact numbers, dates, version numbers, benchmark results, percentages
+- **Capture nuance**: "X is faster than Y in most benchmarks" is better than "X is fast"
+- **Note context**: if a claim only applies in certain conditions, include that context
+- **Distinguish fact from opinion**: author's opinion vs established fact vs measurement
+
+Return a JSON array (max 10 claims per source):
 [
   {
-    "claim": "specific factual statement",
+    "claim": "specific, detailed factual statement with numbers/context where available",
     "claim_type": "quantitative|qualitative|opinion|procedural",
     "confidence": 0.5-0.9,
     "date": "YYYY-MM or null"
   }
 ]
 
-Rules:
-- Extract only claims directly relevant to the query
-- Be specific — include numbers, names, versions
-- Set confidence based on how clearly the source states the claim
-- Max 8 claims per source
-- Return valid JSON only`;
+claim_type guide:
+- quantitative: has numbers, benchmarks, percentages, measurements
+- qualitative: describes properties, characteristics, relationships
+- opinion: author's viewpoint, recommendation, prediction
+- procedural: how-to steps, implementation details
+
+Return valid JSON only.`;
 
 export async function stageExtract(ctx: PipelineContext, sources: TriagedSource[]): Promise<VerifiedClaim[]> {
   const allClaims: VerifiedClaim[] = [];
@@ -35,8 +44,8 @@ export async function stageExtract(ctx: PipelineContext, sources: TriagedSource[
       const content = await webFetchPage(source.url, { timeout: 10_000 });
       if (!content || content.length < 100) return [];
 
-      // Truncate to avoid token limits
-      const truncated = content.slice(0, 15_000);
+      // Truncate to avoid token limits (25k for deeper extraction)
+      const truncated = content.slice(0, 25_000);
 
       const prompt = `Query: "${ctx.query}"\n\nSource URL: ${source.url}\nSource content:\n${truncated}`;
 

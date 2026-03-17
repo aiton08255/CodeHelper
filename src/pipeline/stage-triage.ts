@@ -24,9 +24,9 @@ const LOW_QUALITY_DOMAINS = new Set([
 const HIGH_TLD = new Set(['.edu', '.gov', '.org']);
 
 const DEPTH_TO_TOP_N: Record<string, number> = {
-  quick: 3,
-  standard: 5,
-  deep: 8,
+  quick: 4,
+  standard: 8,
+  deep: 12,
 };
 
 export async function stageTriage(ctx: PipelineContext, results: SearchResult[]): Promise<TriagedSource[]> {

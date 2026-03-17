@@ -4,28 +4,35 @@ import { pollinationsChat } from '../providers/pollinations.js';
 import { groqChat } from '../providers/groq.js';
 import { incrementQuota } from '../quotas/tracker.js';
 
-const VERIFY_PROMPT = `You are a fact verification assistant. Given a list of claims from different sources about the same topic, analyze them for:
+const VERIFY_PROMPT = `You are a rigorous fact verification analyst. Your job is to determine the truth and reliability of each claim by cross-referencing sources.
 
-1. Agreement: do multiple independent sources say the same thing?
-2. Contradictions: do any sources directly disagree?
-3. Confidence: how certain should we be about each claim?
+For EACH claim, evaluate:
 
-Return a JSON array with each claim updated:
+1. **Source Independence**: Are sources truly independent? (same company's blog + docs = 1 source, not 2)
+2. **Source Authority**: Official docs (.gov, .edu, RFC, W3C) >> tech blogs >> forums >> social media
+3. **Temporal Validity**: Is the claim still true? Older claims about evolving tech may be outdated.
+4. **Specificity**: Vague claims get lower confidence than precise ones with numbers/dates.
+5. **Contradictions**: If sources disagree, identify WHY — different contexts? Different time periods? Genuine dispute?
+
+Confidence scoring rules (BE STRICT):
+- 0.85-0.95: Multiple independent authoritative sources agree, with specific evidence
+- 0.70-0.84: Single authoritative source OR multiple decent sources agree
+- 0.50-0.69: Limited evidence, single non-authoritative source, or partially supported
+- 0.30-0.49: Weak evidence, speculative, or poorly sourced
+- NEVER give 0.9+ unless you have rock-solid multi-source agreement from authoritative sources
+
+Return a JSON array:
 [
   {
-    "claim": "the original claim text",
+    "claim": "original claim text",
     "verified_confidence": 0.3-0.95,
     "agreement_score": 0.0-1.0,
     "disputed": true/false,
-    "reasoning": "brief explanation"
+    "reasoning": "why this confidence level — cite which sources agree/disagree"
   }
 ]
 
-Rules:
-- A single authoritative source (.gov, official docs, peer-reviewed) can justify 0.7+ confidence alone
-- Multiple agreeing blog posts max out at 0.7 unless backed by primary sources
-- Contradictions should set disputed=true with both sides preserved
-- Return valid JSON only`;
+Return valid JSON only.`;
 
 export async function stageVerify(ctx: PipelineContext, claims: VerifiedClaim[]): Promise<VerifiedClaim[]> {
   if (claims.length === 0) return claims;
