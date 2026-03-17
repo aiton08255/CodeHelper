@@ -26,6 +26,18 @@ export async function runPipeline(ctx: PipelineContext): Promise<ResearchReport>
   ctx.emit({ type: 'stage-enter', stage: 'recall', detail: 'Checking knowledge base...' });
   const priorKnowledge = await stageRecall(ctx);
 
+  // If RECALL has enough high-confidence claims, skip search entirely
+  if (priorKnowledge.length >= 5 && priorKnowledge.every(c => c.confidence > 0.7)) {
+    ctx.emit({ type: 'stage-progress', stage: 'recall', progress: 100, detail: `Found ${priorKnowledge.length} cached claims, skipping search` });
+    const cachedClaims: VerifiedClaim[] = priorKnowledge.map(c => ({
+      ...c, verified_confidence: c.confidence, agreement_score: 0.8, disputed: false,
+    }));
+    const outline = await stageReason(ctx, cachedClaims);
+    const report = await stageCompose(ctx, outline, cachedClaims);
+    ctx.emit({ type: 'done', report_id: 0, overall_confidence: report.overall_confidence });
+    return report;
+  }
+
   // Stage 1: PLAN
   ctx.emit({ type: 'stage-enter', stage: 'plan', detail: 'Decomposing query...' });
   const plan = await stagePlan(ctx, priorKnowledge);
@@ -45,7 +57,10 @@ export async function runPipeline(ctx: PipelineContext): Promise<ResearchReport>
     const newClaims = await stageExtract(ctx, triaged);
     allClaims.push(...newClaims);
 
-    ctx.emit({ type: 'stage-enter', stage: 'verify', detail: 'Cross-referencing...' });
+    // Deduplicate claims before verification (fixes redundancy issue)
+    allClaims = deduplicateClaims(allClaims);
+
+    ctx.emit({ type: 'stage-enter', stage: 'verify', detail: `Verifying ${allClaims.length} unique claims...` });
     allClaims = await stageVerify(ctx, allClaims);
 
     ctx.emit({ type: 'stage-enter', stage: 'gapfill', detail: 'Checking for gaps...' });
@@ -54,6 +69,9 @@ export async function runPipeline(ctx: PipelineContext): Promise<ResearchReport>
 
     if (shouldExit) break;
   }
+
+  // Final deduplication pass
+  allClaims = deduplicateClaims(allClaims);
 
   // Stage 7: REASON
   ctx.emit({ type: 'stage-enter', stage: 'reason', detail: 'Building argument...' });
@@ -69,4 +87,37 @@ export async function runPipeline(ctx: PipelineContext): Promise<ResearchReport>
 
   ctx.emit({ type: 'done', report_id: 0, overall_confidence: report.overall_confidence });
   return report;
+}
+
+/**
+ * Deduplicates claims by semantic similarity (simple: normalize and compare).
+ * Keeps the claim with the highest confidence when duplicates found.
+ * Boosts confidence when multiple sources agree (agreement signal).
+ */
+function deduplicateClaims(claims: VerifiedClaim[]): VerifiedClaim[] {
+  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+  const seen = new Map<string, VerifiedClaim>();
+
+  for (const claim of claims) {
+    const key = normalize(claim.claim);
+    // Check for exact or near-exact duplicates (first 80 chars match)
+    const shortKey = key.slice(0, 80);
+    const existing = seen.get(shortKey);
+
+    if (existing) {
+      // Multiple sources agree — boost confidence
+      if (claim.source_url !== existing.source_url) {
+        existing.agreement_score = Math.min(1.0, (existing.agreement_score || 0.5) + 0.2);
+        existing.verified_confidence = Math.min(0.95, Math.max(existing.verified_confidence, claim.verified_confidence) + 0.05);
+      }
+      // Keep the higher-confidence version
+      if (claim.verified_confidence > existing.verified_confidence) {
+        seen.set(shortKey, { ...claim, agreement_score: existing.agreement_score });
+      }
+    } else {
+      seen.set(shortKey, claim);
+    }
+  }
+
+  return [...seen.values()];
 }
