@@ -141,7 +141,7 @@ function App() {
       <header className="text-center mb-8">
         <h1 className="text-3xl md:text-4xl font-bold text-white mb-1">Self-Evo</h1>
         <p className="text-slate-400 text-sm">
-          Deep Research Engine
+          Web Search Evo
           <span className={`ml-2 inline-block w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
           <button
             onClick={() => setView(view === 'dashboard' ? 'search' : 'dashboard')}
@@ -175,7 +175,7 @@ function App() {
 
       {/* Footer */}
       <footer className="text-center mt-12 text-xs text-slate-600">
-        Self-Evo v0.1 | Private Research Engine
+        Self-Evo v1.0 | Web Search Evo
       </footer>
     </div>
   );
