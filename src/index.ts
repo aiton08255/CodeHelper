@@ -1,3 +1,10 @@
+import { config as dotenvConfig } from 'dotenv';
+import { join } from 'path';
+import { homedir } from 'os';
+
+// Load .env from data directory
+dotenvConfig({ path: join(homedir(), '.deep-research', '.env') });
+
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
