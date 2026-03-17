@@ -57,7 +57,8 @@ async function main() {
   app.route('/', absorbRouter);
 
   // Start server
-  const server = serve({ fetch: app.fetch, port, hostname: '127.0.0.1' }, (info) => {
+  // Bind to 0.0.0.0 so Tailscale network can reach us
+  const server = serve({ fetch: app.fetch, port, hostname: '0.0.0.0' }, (info) => {
     console.log('');
     console.log('  ┌─────────────────────────────────────┐');
     console.log('  │         Self-Evo Research Engine     │');
