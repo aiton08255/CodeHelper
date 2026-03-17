@@ -4,6 +4,7 @@ import type { PipelineContext } from './orchestrator.js';
 import { webFetchPage } from '../providers/webfetch.js';
 import { llmCall } from '../providers/llm.js';
 import { extractJsonArray } from '../utils/safe-json.js';
+import { parseClaimsFromLLM } from '../schemas/index.js';
 
 const EXTRACT_PROMPT = `Extract factual claims from content relevant to the query. Max 10 per source.
 Be specific: exact numbers, dates, versions, benchmarks. Include context/conditions.
@@ -26,10 +27,13 @@ export async function stageExtract(ctx: PipelineContext, sources: TriagedSource[
         { tier: 'fast', keys: ctx.keys, timeout: 15_000 }
       );
 
-      const rawClaims = extractJsonArray(response.content);
-      if (!rawClaims) return [];
+      const rawJson = extractJsonArray(response.content);
+      if (!rawJson) return [];
 
-      return rawClaims.map((c: any) => ({
+      // Validate claims with Zod — silently drops malformed entries
+      const validClaims = parseClaimsFromLLM(rawJson);
+
+      return validClaims.map((c) => ({
         claim: c.claim,
         source_url: source.url,
         source_quality: source.quality_score,

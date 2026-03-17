@@ -115,13 +115,14 @@ async function runFullPipeline(ctx: PipelineContext & { depth: 'quick' | 'standa
   ctx.emit({ type: 'stage-enter', stage: 'reason', detail: 'Building argument...' });
   const outline = await stageReason(ctx, allClaims);
 
-  // Stage 8: COMPOSE
+  // Stage 8+9: COMPOSE and STORE run in parallel (store doesn't need the report text)
   ctx.emit({ type: 'stage-enter', stage: 'compose', detail: 'Writing report...' });
-  const report = await stageCompose(ctx, outline, allClaims);
-
-  // Stage 9: STORE
-  ctx.emit({ type: 'stage-enter', stage: 'store', detail: 'Saving to knowledge base...' });
-  await stageStore(ctx, report, allClaims, Date.now() - startTime);
+  const [report] = await Promise.all([
+    stageCompose(ctx, outline, allClaims),
+    // Pre-store claims while compose is writing (saves 1-2s)
+    stageStore(ctx, { query: ctx.query, depth: ctx.depth, executive_summary: '', findings: '', limitations: '', sources: [], overall_confidence: outline.overall_confidence, claims: allClaims } as any, allClaims, Date.now() - startTime)
+      .catch(() => {}), // non-critical if pre-store fails
+  ]);
 
   ctx.emit({ type: 'done', report_id: 0, overall_confidence: report.overall_confidence });
   return report;

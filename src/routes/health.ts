@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { getAllQuotas } from '../quotas/tracker.js';
+import { getSourceCount } from '../providers/sources.js';
 
 const startTime = Date.now();
 
@@ -16,5 +17,6 @@ healthRouter.get('/api/health', (c) => {
     status: 'ok',
     uptime_s: Math.floor((Date.now() - startTime) / 1000),
     providers,
+    search_sources: getSourceCount(),
   });
 });

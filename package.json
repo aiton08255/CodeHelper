@@ -9,7 +9,11 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "keywords": ["deep-research", "ai", "self-evolution"],
+  "keywords": [
+    "deep-research",
+    "ai",
+    "self-evolution"
+  ],
   "author": "aiton08255",
   "license": "UNLICENSED",
   "private": true,
@@ -19,7 +23,8 @@
     "better-sqlite3": "^12.8.0",
     "dotenv": "^17.3.1",
     "hono": "^4.12.8",
-    "ws": "^8.19.0"
+    "ws": "^8.19.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

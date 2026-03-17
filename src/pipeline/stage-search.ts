@@ -3,6 +3,7 @@ import { ResearchPlan } from './types.js';
 import type { PipelineContext } from './orchestrator.js';
 import { executeSearch } from '../providers/router.js';
 import { incrementQuota, checkQuota } from '../quotas/tracker.js';
+import { domainTargetedSearch, DOMAIN_TARGETS } from '../providers/sources.js';
 
 export async function stageSearch(ctx: PipelineContext, plan: ResearchPlan): Promise<SearchResult[]> {
   const allResults: SearchResult[] = [];
@@ -62,6 +63,21 @@ export async function stageSearch(ctx: PipelineContext, plan: ResearchPlan): Pro
   for (const result of results) {
     if (result.status === 'fulfilled') {
       allResults.push(...result.value);
+    }
+  }
+
+  // For deep depth, also add domain-targeted searches for richer results
+  if (ctx.depth === 'deep') {
+    const category = plan.intent === 'technical' ? 'tech_docs' :
+                     plan.intent === 'factual' ? 'reference' :
+                     plan.intent === 'trend' ? 'news' : 'academic';
+    const targets = (DOMAIN_TARGETS[category] || []).slice(0, 3);
+    const domainPromises = targets.map(t =>
+      domainTargetedSearch(ctx.query, t, ctx.keys).catch(() => [] as SearchResult[])
+    );
+    const domainResults = await Promise.allSettled(domainPromises);
+    for (const dr of domainResults) {
+      if (dr.status === 'fulfilled') allResults.push(...dr.value);
     }
   }
 

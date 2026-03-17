@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { runPipeline, PipelineContext } from '../pipeline/orchestrator.js';
 import { createEmitter } from '../ws/broadcaster.js';
 import { getDb } from '../db/connection.js';
+import { validateResearchRequest } from '../schemas/index.js';
 
 export const researchRouter = new Hono();
 
@@ -20,12 +21,11 @@ function cleanupResearch() {
 
 researchRouter.post('/api/research', async (c) => {
   const body = await c.req.json();
-  const { query, depth = 'standard' } = body;
-
-  if (!query) return c.json({ error: 'query required' }, 400);
-  if (!['instant', 'quick', 'standard', 'deep', 'auto'].includes(depth)) {
-    return c.json({ error: 'depth must be instant, quick, standard, deep, or auto' }, 400);
+  const parsed = validateResearchRequest(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues.map(i => i.message).join(', ') }, 400);
   }
+  const { query, depth } = parsed.data;
 
   const researchId = nextId++;
   activeResearch.set(researchId, { status: 'running', timestamp: Date.now() });
