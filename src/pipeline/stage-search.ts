@@ -1,3 +1,10 @@
+/**
+ * SEARCH stage — multi-provider parallel search with techniques from:
+ * - GPT Researcher: parallel sub-question crawling
+ * - OpenDeepSearch: two-mode (quick SERP + deep scraping)
+ * - LixSearch: concurrent tool dispatch
+ */
+
 import { SearchResult } from '../providers/types.js';
 import { ResearchPlan } from './types.js';
 import type { PipelineContext } from './orchestrator.js';
@@ -8,77 +15,71 @@ import { domainTargetedSearch, DOMAIN_TARGETS } from '../providers/sources.js';
 export async function stageSearch(ctx: PipelineContext, plan: ResearchPlan): Promise<SearchResult[]> {
   const allResults: SearchResult[] = [];
 
-  // Group sub-questions by provider
-  const providerGroups = new Map<string, string[]>();
-  for (const sq of plan.sub_questions) {
-    const provider = sq.provider;
-    if (!providerGroups.has(provider)) providerGroups.set(provider, []);
-    providerGroups.get(provider)!.push(sq.question);
-  }
-
-  // For standard/deep depth, also add Exa semantic search on the main query
-  // This gives us both keyword (DDG) and semantic (Exa) results
-  if (ctx.depth !== 'quick' && ctx.keys.exa && !checkQuota('exa').exhausted) {
-    if (!providerGroups.has('exa')) providerGroups.set('exa', []);
-    providerGroups.get('exa')!.push(ctx.query);
-  }
-
-  // Execute all provider groups in parallel
+  // === TECHNIQUE 1: Parallel sub-question dispatch (from GPT Researcher) ===
+  // Instead of grouping by provider, fire ALL sub-questions across ALL available providers simultaneously
   const searchPromises: Promise<SearchResult[]>[] = [];
 
-  for (const [provider, questions] of providerGroups) {
+  for (const sq of plan.sub_questions) {
+    const provider = sq.provider;
     const [providerName] = provider.split(':');
+    if (checkQuota(providerName).exhausted) continue;
 
-    const quota = checkQuota(providerName);
-    if (quota.exhausted) {
-      ctx.emit({ type: 'quota-warning', provider: providerName, usage_pct: 100 });
-      continue;
-    }
-
-    for (const question of questions) {
-      const promise = executeSearch(provider, question, ctx.keys)
+    searchPromises.push(
+      executeSearch(provider, sq.question, ctx.keys)
         .then(results => {
           incrementQuota(providerName);
-          for (const r of results) {
-            ctx.emit({ type: 'source-found', url: r.url, title: r.title, quality: 0 });
-          }
+          for (const r of results) ctx.emit({ type: 'source-found', url: r.url, title: r.title, quality: 0 });
           return results;
         })
-        .catch(err => {
-          ctx.emit({ type: 'error', message: `Search failed (${providerName}): ${err.message}`, recoverable: true });
-          return [] as SearchResult[];
-        });
+        .catch(() => [] as SearchResult[])
+    );
+  }
 
-      searchPromises.push(promise);
+  // === TECHNIQUE 2: Multi-provider same query (from OpenDeepSearch) ===
+  // For standard+, search the SAME main query across multiple providers for broader coverage
+  if (ctx.depth !== 'quick' && ctx.depth !== 'instant') {
+    const providers = ['exa', 'google-search', 'duckduckgo'].filter(p => {
+      if (p === 'exa' && !ctx.keys.exa) return false;
+      if (p === 'google-search' && !ctx.keys.googleai) return false;
+      return !checkQuota(p).exhausted;
+    });
+
+    for (const provider of providers) {
+      searchPromises.push(
+        executeSearch(provider, ctx.query, ctx.keys)
+          .then(results => {
+            incrementQuota(provider);
+            for (const r of results) ctx.emit({ type: 'source-found', url: r.url, title: r.title, quality: 0 });
+            return results;
+          })
+          .catch(() => [] as SearchResult[])
+      );
     }
   }
 
-  // Wait for all searches with 10s timeout per promise
+  // === TECHNIQUE 3: Domain-targeted parallel searches for deep/exhaustive (from DeepSearcher) ===
+  if (ctx.depth === 'deep' || ctx.depth === 'exhaustive') {
+    const category = plan.intent === 'technical' ? 'tech_docs' :
+                     plan.intent === 'factual' ? 'reference' :
+                     plan.intent === 'trend' ? 'news' :
+                     plan.intent === 'comparison' ? 'tech_docs' : 'academic';
+    const targets = (DOMAIN_TARGETS[category] || []).slice(0, 4);
+    for (const t of targets) {
+      searchPromises.push(
+        domainTargetedSearch(ctx.query, t, ctx.keys).catch(() => [] as SearchResult[])
+      );
+    }
+  }
+
+  // Fire ALL searches in parallel with 12s global timeout
   const results = await Promise.allSettled(
     searchPromises.map(p =>
-      Promise.race([p, new Promise<SearchResult[]>(resolve => setTimeout(() => resolve([]), 10_000))])
+      Promise.race([p, new Promise<SearchResult[]>(resolve => setTimeout(() => resolve([]), 12_000))])
     )
   );
 
   for (const result of results) {
-    if (result.status === 'fulfilled') {
-      allResults.push(...result.value);
-    }
-  }
-
-  // For deep depth, also add domain-targeted searches for richer results
-  if (ctx.depth === 'deep') {
-    const category = plan.intent === 'technical' ? 'tech_docs' :
-                     plan.intent === 'factual' ? 'reference' :
-                     plan.intent === 'trend' ? 'news' : 'academic';
-    const targets = (DOMAIN_TARGETS[category] || []).slice(0, 3);
-    const domainPromises = targets.map(t =>
-      domainTargetedSearch(ctx.query, t, ctx.keys).catch(() => [] as SearchResult[])
-    );
-    const domainResults = await Promise.allSettled(domainPromises);
-    for (const dr of domainResults) {
-      if (dr.status === 'fulfilled') allResults.push(...dr.value);
-    }
+    if (result.status === 'fulfilled') allResults.push(...result.value);
   }
 
   // Deduplicate by URL
