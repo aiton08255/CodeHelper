@@ -5,3 +5,5 @@ dist/
 *.db-journal
 *.db-wal
 .superpowers/
+web/dist/
+web/node_modules/
