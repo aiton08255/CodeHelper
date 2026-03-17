@@ -18,6 +18,7 @@ import { quotasRouter } from './routes/quotas.js';
 import { evolutionRouter } from './routes/evolution.js';
 import { healthRouter } from './routes/health.js';
 import { absorbRouter } from './routes/absorb.js';
+import { benchmarkRouter } from './routes/benchmark.js';
 
 async function main() {
   // Initialize data directory and defaults
@@ -55,6 +56,7 @@ async function main() {
   app.route('/', quotasRouter);
   app.route('/', evolutionRouter);
   app.route('/', absorbRouter);
+  app.route('/', benchmarkRouter);
 
   // Start server
   // Bind to 0.0.0.0 so Tailscale network can reach us

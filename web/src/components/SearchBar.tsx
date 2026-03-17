@@ -1,13 +1,14 @@
 import { useState } from 'react';
 
-type Depth = 'auto' | 'instant' | 'quick' | 'standard' | 'deep';
+type Depth = 'auto' | 'instant' | 'quick' | 'standard' | 'deep' | 'exhaustive';
 
 const DEPTH_INFO: Record<Depth, { label: string; hint: string }> = {
-  auto:     { label: 'Auto',     hint: 'Smart — picks the right depth' },
-  instant:  { label: 'Instant',  hint: '~2s — simple facts' },
-  quick:    { label: 'Quick',    hint: '~10s — moderate questions' },
-  standard: { label: 'Standard', hint: '~20s — comparisons & analysis' },
-  deep:     { label: 'Deep',     hint: '~35s — full research' },
+  auto:       { label: 'Auto',       hint: 'Smart — picks the right depth' },
+  instant:    { label: 'Instant',    hint: '~2s — simple facts' },
+  quick:      { label: 'Quick',      hint: '~10s — moderate questions' },
+  standard:   { label: 'Standard',   hint: '~20s — comparisons & analysis' },
+  deep:       { label: 'Deep',       hint: '~40s — full research' },
+  exhaustive: { label: 'Exhaustive', hint: '~2min — maximum depth, 15 loops' },
 };
 
 interface Props {

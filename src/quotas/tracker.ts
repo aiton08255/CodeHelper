@@ -17,7 +17,8 @@ const PROVIDER_LIMITS: Record<string, { limit: number; period: 'daily' | 'monthl
   mistral: { limit: 100000, period: 'monthly' },
   duckduckgo: { limit: 150, period: 'daily' },
   openrouter: { limit: 200, period: 'daily' },
-  'google-ai': { limit: 1500, period: 'daily' }, // free: 15 RPM, 1500 req/day
+  'google-ai': { limit: 1500, period: 'daily' },
+  huggingface: { limit: 300, period: 'daily' }, // free: ~5 req/min
 };
 
 function getCurrentPeriodStart(period: 'daily' | 'monthly' | 'lifetime'): string {

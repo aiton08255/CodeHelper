@@ -170,7 +170,7 @@ export const ProviderLimitSchema = z.object({
 
 export const ResearchRequestSchema = z.object({
   query: z.string().min(1).max(2000),
-  depth: z.enum(['instant', 'quick', 'standard', 'deep', 'auto']).default('auto'),
+  depth: z.enum(['instant', 'quick', 'standard', 'deep', 'exhaustive', 'auto']).default('auto'),
 });
 
 export const ToolReviewSchema = z.object({

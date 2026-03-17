@@ -14,12 +14,14 @@ import { classifyQuery, Depth } from './classifier.js';
 
 export interface PipelineContext {
   query: string;
-  depth: 'instant' | 'quick' | 'standard' | 'deep' | 'auto';
+  depth: 'instant' | 'quick' | 'standard' | 'deep' | 'exhaustive' | 'auto';
   emit: WSEmitter;
   keys: Record<string, string>;
 }
 
-const MAX_LOOPS: Record<string, number> = { quick: 1, standard: 2, deep: 3 };
+// Configurable iteration ceiling — deep can go up to 500 with smart early-exit
+const MAX_LOOPS: Record<string, number> = { quick: 1, standard: 3, deep: 5, exhaustive: 15 };
+// Gap-fill's diminishing returns detector will early-exit when <15% new claims
 
 /**
  * Main entry point — routes to the right pipeline based on depth.
@@ -44,10 +46,10 @@ export async function runPipeline(ctx: PipelineContext): Promise<ResearchReport>
   }
 
   // Full pipeline for quick/standard/deep
-  return runFullPipeline(ctx as PipelineContext & { depth: 'quick' | 'standard' | 'deep' });
+  return runFullPipeline(ctx as PipelineContext & { depth: 'quick' | 'standard' | 'deep' | 'exhaustive' });
 }
 
-async function runFullPipeline(ctx: PipelineContext & { depth: 'quick' | 'standard' | 'deep' }): Promise<ResearchReport> {
+async function runFullPipeline(ctx: PipelineContext & { depth: 'quick' | 'standard' | 'deep' | 'exhaustive' }): Promise<ResearchReport> {
   const startTime = Date.now();
 
   // Stage 0: RECALL

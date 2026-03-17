@@ -3,6 +3,7 @@ import { SearchBar } from './components/SearchBar';
 import { LiveProgress } from './components/LiveProgress';
 import { Report } from './components/Report';
 import { Dashboard } from './components/Dashboard';
+import { SearchHistory } from './components/SearchHistory';
 import { startResearch, getResearch, connectWebSocket, setToken, getToken, checkHealth } from './lib/api';
 import './App.css';
 
@@ -160,6 +161,7 @@ function App() {
       {view !== 'dashboard' && (
         <>
           <SearchBar onSearch={handleSearch} disabled={view === 'progress'} />
+          {view === 'search' && <SearchHistory onSelect={handleSearch} />}
 
           {view === 'progress' && (
             <LiveProgress events={events} currentStage={currentStage} />
