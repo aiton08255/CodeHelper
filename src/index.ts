@@ -78,6 +78,24 @@ async function main() {
   // WebSocket setup
   setupWebSocket(server as any, token);
 
+  // Auto-learning: run scheduled learning 30s after startup (non-blocking)
+  setTimeout(async () => {
+    try {
+      const { runScheduledLearning } = await import('./evolution/scheduler.js');
+      const keys = {
+        exa: process.env.EXA_API_KEY || '',
+        serper: process.env.SERPER_API_KEY || '',
+        groq: process.env.GROQ_API_KEY || '',
+        mistral: process.env.MISTRAL_API_KEY || '',
+        googleai: process.env.GOOGLE_AI_KEY || '',
+      };
+      const result = await runScheduledLearning(keys);
+      if (result.tasks_run > 0) {
+        console.log(`  Auto-learning: ${result.tasks_run} topics researched, ${result.tasks_skipped} skipped`);
+      }
+    } catch {}
+  }, 30_000);
+
   // Graceful shutdown
   const shutdown = () => {
     console.log('\nShutting down...');

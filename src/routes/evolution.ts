@@ -5,6 +5,7 @@ import { getPerformanceSummary } from '../evolution/analyzer.js';
 import { consolidateKnowledge, getKBHealth } from '../evolution/consolidator.js';
 import { getCacheStats } from '../memory/semantic-cache.js';
 import { discoverTools, getDiscoveries, updateToolStatus } from '../evolution/discovery.js';
+import { runScheduledLearning, getLearningStatus } from '../evolution/scheduler.js';
 
 export const evolutionRouter = new Hono();
 
@@ -76,4 +77,21 @@ evolutionRouter.post('/api/evolution/tool-review', async (c) => {
   }
   updateToolStatus(body.url, body.status);
   return c.json({ ok: true });
+});
+
+// Continuous learning
+evolutionRouter.post('/api/evolution/learn', async (c) => {
+  const keys = {
+    exa: process.env.EXA_API_KEY || '',
+    serper: process.env.SERPER_API_KEY || '',
+    groq: process.env.GROQ_API_KEY || '',
+    mistral: process.env.MISTRAL_API_KEY || '',
+    googleai: process.env.GOOGLE_AI_KEY || '',
+  };
+  const result = await runScheduledLearning(keys);
+  return c.json(result);
+});
+
+evolutionRouter.get('/api/evolution/learn/status', (c) => {
+  return c.json(getLearningStatus());
 });
