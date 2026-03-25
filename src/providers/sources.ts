@@ -60,14 +60,26 @@ export interface SearchSource {
   description: string;
 }
 
+// Tier 1 High-Quality Sources (Official, Academic, Verified)
+export const TIER_1_SOURCES = [
+  'site:docs.*', 'site:developer.*', 'site:arxiv.org', 'site:ieee.org',
+  'site:github.com', 'site:stackoverflow.com', 'site:w3.org'
+];
+
 /**
  * Get all available search sources for a given query type.
  */
-export function getSourcesForQuery(queryType: string): SearchSource[] {
+export function getSourcesForQuery(queryType: string, tier: 'all' | 'high' = 'high'): SearchSource[] {
   const sources: SearchSource[] = [];
+
+  // Always include Context7 (live documentation) as Tier 1
+  sources.push({ id: 'context7:docs', provider: 'context7', description: 'Context7 live library documentation' });
 
   // Exa categories
   for (const cat of EXA_CATEGORIES) {
+    // Only include research/pdf for high-tier requests
+    if (tier === 'high' && !['research paper', 'pdf', 'github'].includes(cat)) continue;
+    
     sources.push({
       id: `exa:${cat}`,
       provider: 'exa',
@@ -76,19 +88,23 @@ export function getSourcesForQuery(queryType: string): SearchSource[] {
     });
   }
 
-  // DDG
-  sources.push({ id: 'ddg:search', provider: 'duckduckgo', description: 'DuckDuckGo instant answers' });
-  sources.push({ id: 'ddg:news', provider: 'duckduckgo', category: 'news', description: 'DuckDuckGo news' });
-
-  // Domain-targeted
+  // Domain-targeted (Filtering for quality)
   const targetCategory = DOMAIN_TARGETS[queryType] || DOMAIN_TARGETS.tech_docs;
   for (const domain of targetCategory) {
+    // For high-tier, only include domains that match TIER_1_SOURCES patterns
+    if (tier === 'high' && !TIER_1_SOURCES.some(t => domain.includes(t.replace('site:', '').replace('*', '')))) continue;
+    
     sources.push({
       id: `domain:${domain}`,
       provider: 'exa',
       domain_filter: domain,
       description: `Targeted: ${domain}`,
     });
+  }
+
+  // Fallback to DDG only if low-tier
+  if (tier === 'all') {
+    sources.push({ id: 'ddg:search', provider: 'duckduckgo', description: 'DuckDuckGo instant answers' });
   }
 
   return sources;
@@ -158,6 +174,7 @@ export async function pollinationsSearch(
  */
 export function getSourceCount(): number {
   let count = EXA_CATEGORIES.length; // Exa categories
+  count += 1; // Context7
   count += 2; // DDG search + news
   count += POLLINATIONS_SEARCH_MODELS.length; // Pollinations search models
   count += 4; // OpenRouter models
