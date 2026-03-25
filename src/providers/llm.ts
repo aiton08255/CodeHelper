@@ -1,0 +1,96 @@
+/**
+ * Unified LLM call with automatic fallback chain.
+ * 8 providers: Groq, Pollinations (30+ models), Mistral, OpenRouter (24+ free models)
+ */
+
+import { groqChat } from './groq.js';
+import { pollinationsChat } from './pollinations.js';
+import { mistralChat } from './mistral.js';
+import { openrouterChat } from './openrouter.js';
+import { googleAIChat } from './google-ai.js';
+import { incrementQuota } from '../quotas/tracker.js';
+
+interface LLMMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+interface LLMOptions {
+  tier: 'fast' | 'reason' | 'compose';
+  keys: Record<string, string>;
+  timeout?: number;
+}
+
+interface LLMResult {
+  content: string;
+  provider: string;
+}
+
+// Deeper fallback chains with more providers for resilience
+const TIER_CHAINS: Record<string, { provider: string; model?: string }[]> = {
+  fast: [
+    { provider: 'groq' },
+    { provider: 'google-ai', model: 'gemini-2.0-flash' },
+    { provider: 'pollinations', model: 'openai-fast' },
+    { provider: 'openrouter', model: 'meta-llama/llama-3.3-70b-instruct:free' },
+    { provider: 'mistral' },
+  ],
+  reason: [
+    { provider: 'pollinations', model: 'perplexity-reasoning' },
+    { provider: 'google-ai', model: 'gemini-2.5-pro' },
+    { provider: 'pollinations', model: 'deepseek' },
+    { provider: 'openrouter', model: 'qwen/qwen3-235b-a22b:free' },
+    { provider: 'groq' },
+  ],
+  compose: [
+    { provider: 'google-ai', model: 'gemini-2.0-flash' },
+    { provider: 'mistral' },
+    { provider: 'pollinations', model: 'openai-large' },
+    { provider: 'openrouter', model: 'google/gemma-3-27b-it:free' },
+    { provider: 'groq' },
+  ],
+};
+
+export async function llmCall(messages: LLMMessage[], opts: LLMOptions): Promise<LLMResult> {
+  const chain = TIER_CHAINS[opts.tier] || TIER_CHAINS.fast;
+  const timeout = opts.timeout || 20_000;
+  let lastError: Error | null = null;
+
+  for (const link of chain) {
+    try {
+      let content: string;
+
+      switch (link.provider) {
+        case 'groq':
+          if (!opts.keys.groq) continue;
+          content = (await groqChat(messages, opts.keys.groq, { timeout })).content;
+          break;
+        case 'pollinations':
+          content = (await pollinationsChat(messages, link.model || 'openai-fast', { timeout })).content;
+          break;
+        case 'mistral':
+          if (!opts.keys.mistral) continue;
+          content = (await mistralChat(messages, opts.keys.mistral, { timeout })).content;
+          break;
+        case 'openrouter':
+          content = (await openrouterChat(messages, link.model, { timeout })).content;
+          break;
+        case 'google-ai':
+          if (!opts.keys.googleai) continue;
+          content = (await googleAIChat(messages, opts.keys.googleai, { model: link.model, timeout })).content;
+          break;
+        default:
+          continue;
+      }
+
+      incrementQuota(link.provider);
+      return { content, provider: link.provider };
+    } catch (err) {
+      lastError = err as Error;
+      continue;
+    }
+  }
+
+  const failedProviders = chain.map(l => l.provider).join(', ');
+  throw lastError || new Error(`All LLM providers failed (tried: ${failedProviders})`);
+}

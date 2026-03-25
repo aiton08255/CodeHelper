@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+*.db
+*.db-journal
+*.db-wal
+.superpowers/
+web/dist/
+web/node_modules/
